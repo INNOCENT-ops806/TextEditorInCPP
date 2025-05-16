@@ -5,10 +5,6 @@
 - [Description](Description)
 - [Features](#features)
 - [Motivation](#Motivation)
-- [Future Plans](#Future Plans)
-- [ How to use or Installing ](# How to use or Installing )
-- [Technology Used](#Technology Used)
-- [Screenshot if possible](#screenshot)
 
 ## Description
 
