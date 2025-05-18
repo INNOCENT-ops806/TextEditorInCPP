@@ -1,28 +1,47 @@
 #include <cerrno>
 #include <cctype>
+#include <cstring>
 #include <iostream>
 #include <cstdlib>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <termios.h>
+
 using namespace std;
 
-struct termios orig_termios;
-
 #define CTRL_KEY(k) ((k) & 0x1f)
+
+struct abuf {
+  char *b;
+  int len;
+};
+
+#define ABUF_INIT {NULL, 0}
+
+void abAppend(struct abuf *ab, const char *s, int len) {
+  char *new_buf = (char *)realloc(ab->b, ab->len + len);
+  if (new_buf == NULL) return;
+  memcpy(&new_buf[ab->len], s, len);
+  ab->b = new_buf;
+  ab->len += len;
+}
+
+void abFree(struct abuf *ab) {
+  free(ab->b);
+}
 
 struct editorConfig {
   int screenrows = 0;
   int screencols = 0;
-
   struct termios orig_termios;
 };
-struct editorConfig E; 
+
+struct editorConfig E;
 
 void die(const char *s) {
-  write(STDIN_FILENO, "\x1b[2j", 4);
-  write(STDIN_FILENO, "\x1b[H", 3);
-  cerr << "Error: " << s << endl;
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  write(STDOUT_FILENO, "\x1b[H", 3);
+  perror(s);
   exit(1);
 }
 
@@ -48,7 +67,7 @@ void enableRawMode() {
 
 char editorReadKey() {
   int nread = 0;
-  char c = ' ';
+  char c;
   while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
     if (nread == -1 && errno != EAGAIN) die("read");
   } 
@@ -76,9 +95,8 @@ int getCursorPosition(int *rows, int *cols) {
 
 int getWindowSize(int *rows, int *cols) {
   struct winsize ws;
-
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-    if (write(STDOUT_FILENO, "\x1b[999C\x1b[9990B", 12) != 12) return -1;
+    if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
     return getCursorPosition(rows, cols);
   } else {
     *cols = ws.ws_col;
@@ -89,40 +107,41 @@ int getWindowSize(int *rows, int *cols) {
 
 void EditorDrawRows(struct abuf *ab) {
   for (int y = 0; y < E.screenrows; y++) {
-    abAppend(ab,"~",1);
-    if(y < E.screenrows - 1)
-      abAppend(ab,"\r\n",2);
+    abAppend(ab, "~", 1);
+    if (y < E.screenrows - 1) {
+      abAppend(ab, "\r\n", 2);
+    }
   }
 }
 
 void editorRefreshScreen() {
-  struct abuf ab= ABUF_INIT;
-  
-  abAppend(&ab, "\x1b[2j",4);
-  abAppend(&ab,"\x1b[H",3);
+  struct abuf ab = ABUF_INIT;
 
-  EditorDrawRows(&ab); 
+  abAppend(&ab, "\x1b[2J", 4);
+  abAppend(&ab, "\x1b[H", 3);
 
-  abAppend(&ab,"\x1b[H",3);
+  EditorDrawRows(&ab);
 
-  write(STDOUT_FILENO,ab.b,ab.len);
+  abAppend(&ab, "\x1b[H", 3);
+
+  write(STDOUT_FILENO, ab.b, ab.len);
   abFree(&ab);
-
-  EditorDrawRows(); 
-  write(STDOUT_FILENO, "\x1b[H", 3); 
 }
 
 void editorProcessKeypress() {
   char c = editorReadKey();
   switch (c) {
     case CTRL_KEY('q'):
+      write(STDOUT_FILENO, "\x1b[2J", 4);
+      write(STDOUT_FILENO, "\x1b[H", 3);
       exit(0);
       break;
   }
 }
 
 void initEditor() {
-  if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
+  if (getWindowSize(&E.screenrows, &E.screencols) == -1)
+    die("getWindowSize");
 }
 
 int main() {
