@@ -1,11 +1,5 @@
 # TextEditorInCPP
 
-## Table of Contents
-
-- [Description](Description)
-- [Features](#features)
-- [Motivation](#Motivation)
-
 ## Description
 
 This is a text editor written in C++ that provides basic functionality for editing text files. It offers a simple interface for creating, opening, and saving text files, as well as editing text within the editor.
