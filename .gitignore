@@ -1,1 +1,4 @@
 Makefile
+.vscode/
+.clang-format
+notes.md
